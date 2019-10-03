@@ -22,7 +22,7 @@
 
     2. 使用RAID增强传统机器硬盘的性能
 
-       RAID级别选择
+       ![RAID级别选择](https://github.com/chenyaowu/mysql/blob/master/img/RAID.jpg)
 
     3. 使用固态存储SSD和PCI-E卡
 
@@ -127,7 +127,7 @@
 
 ### MySql体系客户端
 
-[MySql体系客户端]()
+![MySql体系客户端](https://github.com/chenyaowu/mysql/blob/master/img/Mysql_System1.jpg)
 
 
 
@@ -288,12 +288,6 @@
   - 过分的范式化造成太多的表关联
   - 在OLTP环境中使用不恰当的分区表
   - 使用外键保证数据的完整性
-
-
-
-
-
-
 
 ### Mysql基准测试
 
