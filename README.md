@@ -445,20 +445,83 @@
 - Mysql进行基准测试常见指标
   
   - 单位时间内所处理的事务数（TPS）
-  
   - 单位时间内所处理的查询数（QPS）
-  
   - 响应时间
-  
   - 并发量：同时处理的查询请求的数量
   
-    
   
-    
   
-    
-  
-    
+- 计划和设计基准测试
+
+  - 对整个系统还是某一组件
+  - 使用什么样的数据
+  - 准备基准测试及数据收集脚本
+    - CPU使用率、IO、网络流量、状态与计数器信息等（Get_Test_info.sh）
+  - 运行基准测试
+  - 保存及分析基准测试结果（analysis.sh）
+
+- 常用基准测试功能
+
+  - Mysql基准测试工具(mysqlslap)
+
+    - mysql内置
+
+    - 可以模拟服务器负载，并输出相关统计信息
+
+    - 可以指定也可以自动生成查询语句
+
+    - 常用参数
+
+      ```bash
+      -- auto-generate-sql 由系统自动生成SQL脚本进行测试
+      -- auto-generate-sql-add-autoincrement 在生成的表中增加自增ID
+      -- auto-generate-sql-load-type 指定测试中使用的查询类型
+      -- auto-generate-sql-write-number 指定初始化数据时生成的数据量
+      -- concurrency 指定并发线程的数量
+      -- engine 指定要测试表的存储引擎，可以用逗号分隔多个存储引擎
+      -- no-drop 指定不清理测试数据
+      -- iterations 指定测试运行的次数
+      -- number-of-queries 指定每一个线程执行的查询次数
+      -- debug-info 指定输出额外的内存及CPU统计信息
+      -- number-int-cols 指定测试表中包含的INT类型列的数量
+      -- number-char-cols 指定测试表中包含的varchar类型的数量
+      -- create-schema 指定了用于执行测试的数据库名字
+      -- query 用于指定自定义SQL的脚本
+      -- only-print 并不运行测试脚本，而是把生成的脚本打印出来
+      ```
+
+  - Mysql基准测试工具(sysbench)
+
+    - 另外安装
+
+    - 常用参数
+
+      - -- test 用于指定所要指定的测试类型，支持一下参数
+
+      - Fileio 文件系统I/O性能测试
+
+      - cpu CPU性能测试
+
+      - memory 内存性能测试
+
+      - Oltp 测试要指定具体的lua脚本
+
+        ```bash
+        --mysql-db 用于指定执行基准测试的数据库名
+        --mysql-table-engine 用于指定所使用的存储引擎
+        --oltp-tables-count 执行测试的表的数量
+        --oltp-table-size 指定每个表中的数据行数
+        --num-threads 指定测试的并发线程数量
+        --max-time 指定最大的测试时间
+        --report-interval 指定间隔多长时间输出一个统计信息
+        --mysql-user 指定执行测试的Mysql用户
+        --mysql-password 指定执行测试的MySQL用户的密码
+        prepare 用于准备测试数据
+        run 用于实际进行测试
+        cleanup 用于清理测试数据
+        ```
+
+        
 
 
 
