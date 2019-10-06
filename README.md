@@ -508,6 +508,129 @@
       analyze table table_name
       ```
 
+
+#### SQL查询优化
+
+- 获取有性能问题的SQL
+
+  - 通过用户反馈/测试人员
+
+  - 慢日志获取存在性能问题的SQL
+
+    ```bash
+    slow_query_log  // 启停记录慢查询日志
+    slow_query_log_file // 指定慢查询日志的存储路径及文件
+    long_query_time // 指定记录慢查询日志SQL执行时间的阈值
+    log_queries_not_using_indexes // 是否记录未使用索引的SQL
+    ```
+
+  - 常用的慢查询日志分析工具
+
+    - mysqldumpslow: 汇总除查询条件外其他完全相同的SQL，并将分析结果按照参数中所指定的顺序输出
+  
+    ```bash
+    mysqldumpslow -s r -t 10 slow-mysql.log
+    ```
+  
+    - pt-query-digest
+  
+      ```bash
+      pt-query-digest --explain h=127.0.0.1, u=root, p=pawword slow-mysql.log
+      ```
+  
+  - 实时获取存在性能问题的SQL
+  
+    ```bash
+    SELECT `id`, `user`, `host`, DB, command, `time`, `state`, `info` FROM information_schema.PROCESSLIST WHERE TIME>=60
+    ```
+  
+- Mysql服务器处理查询请求的整个过程
+
+  1. 客户端发送SQL请求给服务器
+  2. 服务器检查是否可以在查询缓存中命中该SQL
+  3. 服务器端进行SQL解析，预处理，再由优化器生成对应的执行计划
+  4. 根据执行计划，调用存储引擎API来查询数据
+  5. 将结果返回给客户端
+
+- 查询速度为什么会慢
+
+  - 对于一个读写频繁的系统，使用查询缓存很可能会将内地查询处理的效率
+
+    ```bash
+    query_cache_type // 设置查询缓存是否可用
+    query_cache_size // 设置查询缓存的内存大小
+    query_cache_limit // 设置查询缓存可用存储的最大值
+    query_cache_wlock_invalidate // 设置数据表被锁后是否返回缓存中的数据
+    query_cache_min_res_unit // 设置查询缓存分配的内存块最小单位
+    ```
+
+  - 会造成Mysql生成错误的执行计划的原因
+
+    - 统计信息不准确
+    - 执行计划中的成本估算不等同于实际的执行计划的成本
+    - MySQL优化器所认为的最优可能与你所认为的最优不一样（基于其成本模型选择最优的执行计划）
+    - MySQL从不考虑其他并发的查询，这可能会影响当前查询的速度。
+    - MySQL有时候也会基于一些固定的规则来生成执行计划
+    - MySQL不会考虑不受其控制的成本
+
+  - MySQL优化器可优化的SQL类型
+
+    - 重新定义表的关联顺序
+    - 将外连接转化成内连接
+    - 使用等价变换规则
+    - 优化count()、min()和max()
+    - 将一个表达式转化为常数表达式
+    - 使用等价变换规则
+    - 子查询优化
+    - 提前终止查询
+    - 对in()条件进行优化
+
+  - 确定查询处理各个阶段所消耗的时间
+
+    - 使用profile（当前session)(将过期)
+
+      1. set profiliing = 1
+
+      2. 执行查询
+
+      3. show profiles;
+
+         show profiles for query N 查询的每个阶段所消耗的时间
+
+    - 使用performance_schema
+
+      - 启动监控
+
+        ```bash
+        UPDATE `setup_instruments` SET enabled = 'YES', TIMED= 'YES' WHERE NAME LIKE '%stage%';
+        UPDATE `setup_consumers` SET enable = 'YES' WHERE NAME LIKE 'events%';
+        ```
+
+  - 特定SQL优化
+
+    - 大表数据修改和更新，分批处理
+
+    - 大表表结构修改，使用pt-online-schema
+
+      ```bash
+      pt-online-schema-change \
+       --alter "MODIFY c VARCHAR(150) NOT NULL DEFAULT ''" \
+       -- user=root --password=password D=databases, t=table \
+       --charset=utf8 --execute
+      ```
+
+      1. 新建表（修改后的结构）
+      2. 老表的数据导入新表
+      3. 同步完之后，老表建立排他锁
+      4. 新表重命名
+      5. 删除老表
+
+    - 优化not in 和 <>查询，使用LEFT JOIN
+
+    - 使用汇总表优化查询
+
+      
+
       
 
 ### Mysql基准测试
