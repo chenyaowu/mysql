@@ -420,6 +420,215 @@
         - 日期时间类型还有着丰富的处理函数，可以方便的对日期类型进行日期计算
       - 使用Int存储日期时间不如使用Timestamp类型
 
+#### MySQL高可用架构设计
+
+- Mysql复制
+
+  - 实现在不同服务器上的数据分布
+  - 实现数据读取的负载均衡
+  - 增加了数据的安全性
+  - 实现数据库高可用和故障切换
+  - 实现数据库在线升级 
+
+- Mysql二进制日志
+
+  - 记录了所有对Mysql数据库的修改事件，包括增删改查事件和对表结构的修改事件
+
+  - 二进制日志的格式
+
+    - 基于段的格式binlog_format=STATEMENT
+
+      - 优点：日志记录量相对较小，节约磁盘及网络I/O
+      - 缺点：
+        - 必须要记录上下文信息，保证语句在服务器上执行结果和在主服务器上相同
+        -  特定函数UUID(),user()这样非确定性函数还是无法复制
+        - 可能造成Mysql复制的主备服务器数据不一致
+  - 对复制的影响
+        - 优点：
+      - 生成的日志量少，节约网络传输I/O
+          - 并不强制要求主从数据库的表定义完全相同
+      - 相比于基于行的复制方式更为灵活
+        - 缺点：
+          - 对于非确定事件，无法保证主从复制数据的一致性
+          - 对于存储过程，触发器，自定义函数进行的修改也可能造成数据不一致
+          - 相比于基于行的复制方式再从上执行时需要更多的行锁
+- 基于行的格式binlog_format=ROW
+    
+      - 优点：
+    
+        - 使Mysql主从复制更加安全
+        - 对每一行数据的修改比基于段的复制高效
+  - 缺点：记录日志量较大
+      - 对复制的影响
+    - 优点：
+          - 可以应用于任何SQL的复制包括非确定函数，存储过程等
+      - 可以减少数据库锁的使用
+        - 缺点：
+          - 要求主从数据库的表结构相同，否则可能会中断复制
+          - 无法在从上单独执行触发器
+     - 基于混合的格式binlog_format=MIXED
+       
+         - 特点：根据SQL语句由系统决定在基于段和行的日志格式中进行选择。数据量大小由所执行的SQL语句决定。
+     - 如何选择二进制日志格式
+     - 建议：     ROW、  MIXED、Binlog_row_image=minimal
+  
+- Mysql复制工作方式
+
+  ![](https://github.com/chenyaowu/mysql/blob/master/img/Master_Slave.jpg)
+
+  1. 主数据库将变更写入二进制文件
+  2. 从数据库读取主数据库的二进制日志变更并写入到relay_log中
+  3. 在从数据库上重放relay_log中的日志
+
+- 配置Mysql复制
+
+  - 基于日志点的复制配置
+
+    - 优点：是Mysql最早支持的复制技术，Bug少。对SQL查询没有任何限制。故障处理容易。
+    - 缺点：故障转移时重新获取新主的日志点信息比较困难
+    - 步骤：
+
+    1. 配置主数据库服务器 
+
+    ```bash
+    big_log= mysql-bin
+    server_id= 100
+    ```
+
+    2. 配置从数据库服务器
+
+    ```bash
+    bin_log=mysql-bin
+    server_id=101
+    relay_log=mysql-relay-bin
+    log_slave_update=on
+    read_only=on
+    ```
+
+    3. 初始化从服务器数据
+
+    4. 启动复制连路
+
+  - 基于GTID复制（Mysql5.6）
+
+    - GTID即全局事务ID，其保证为每一个在主上提交的事务在复制集群中可以生成一个唯一的ID
+
+    ![GTID](https://github.com/chenyaowu/mysql/blob/master/img/GTID.jpg)
+
+    - 优点：
+      - 可以很方便的进行故障转移
+      - 从库不会丢失主库上的任何修改
+    - 缺点：
+      - 故障处理比较复杂
+      - 对执行的SQL有一定的限制
+
+    - 步骤
+
+      1. 在主DB服务器上建立复制账号
+
+      2. 配置主数据库服务器
+
+         ```bash
+         bin_log=/usr/local/mysql/log/mysql-bin
+         server_id=100
+         gtid_mode=on
+         enforce-gtid-consistency
+         log-slave-updates=on 
+         ```
+
+      3. 配置从数据库服务器
+
+         ```bash
+         server_id=101
+         relay_log=/usr/local/mysql/log/relay_log
+         gtid_mode=on
+         enforce-gtid-consistency
+         log-slave-updates=on 
+         read_only=on
+         master_info_repository=TABLE
+         relay_log_info_repository=TABLE
+         ```
+
+      4. 初始化从服务器数据
+
+      5. 启动基于GTID的复制
+
+  - 如何选择复制模式
+
+    - 所使用的MySQL版本
+    - 复制架构及主从切换方式
+    - 所使用的高可用管理组件
+    - 对应用的支持程度
+
+- Mysql复制拓扑
+
+  - 一主多从的复制拓扑
+
+    - 优点
+      - 配置简单
+      - 可以用多个从库分担读负载
+    - 用途
+      - 为不同业务使用不同的从库
+      - 将一台从库放到远程IDC，用作灾备恢复
+      - 分担主库的读负载
+
+  - 主-主复制拓扑
+
+    - 主备复制模式
+
+      - 只有一台主服务器对外提供服务
+      - 一台服务器处于只读状态并且只作为热备使用
+      - 在对外提供服务的主库出现故障或是计划性的维护时，才会进行切换
+      - 使原来的备库成为主库，而原来的主库会成为新的备库并处理只读或者下线状态，待维护完成后重新上线。
+      - 注意事项
+        - 确保两台服务器上的初始化数据相同
+        - 确保两台服务器上已经启动binlog并且有不同的server_id
+        - 在两台服务器上启动log_slave_updates参数
+        - 在初始的备库上启用read_only
+
+    - 主主复制模式
+
+      - 两个主中所操作的表最好能够分开
+
+      - 使用下面两个参数控制自增ID的生成
+
+        ```bash
+        auto_increment_increment=2
+        auto_increment_offset= 1|2
+        ```
+
+  - 拥有备库的主-主复制拓扑
+
+- 影响主从延迟的因素
+
+  - 主库写入二进制日志的时间 → 控制主库的事务大小，分割大事务
+
+  - 二进制日志传输时间  → 使用MIXED日志格式，设置set binlog_row_image=minimal;
+
+  - 默认情况下从数据库只有一个SQL线程，主数据库上并发修改在从数据库上变成了串行 → 使用多线程复制（在Mysql5.7中可以按照逻辑时钟的方式来分配SQL线程）
+
+  - 配置多线程复制
+
+    ```bash
+    stop slave
+    set global slave_parallel_type = 'logical_clock';
+    set global slave_parallel_workers=4;
+    start slave;
+    ```
+
+- 常见问题
+
+  - 由于数据损坏或丢失所引起的主从复制错误
+    - 主库或从库意外宕机引起的错误
+    - 主库上的二进制日志损坏
+    - 备库上的中继日志损坏
+  - 在从库上进行数据修改造成的主从复制错误
+  - 不唯一的server_id和server_uuid
+  - max_allow_packet设置引起的主从复制错误
+  - 分担主数据库的写负载
+  - 自动进行故障转移及主从切换
+  - 提供读写分离的功能
+
 #### 索引优化
 
 - 索引大大减少了存储引擎需要扫描的数据量
